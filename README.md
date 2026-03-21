@@ -365,4 +365,24 @@ MIT — see [LICENSE](LICENSE)
 
 **Mint · Seal · Trade · Open · Collect**
 
+---
+
+## 🌐 Community & Links
+
+<div align="center">
+
+[![Telegram](https://img.shields.io/badge/🤖_Telegram_Bot-@gemsrock__bot-26A5E4?style=for-the-badge&logo=telegram)](https://t.me/gemsrock_bot)
+[![Mini App](https://img.shields.io/badge/🎲_Mini_App-Open_GemsRock-26A5E4?style=for-the-badge&logo=telegram)](https://t.me/gemsrock_bot/RockGems)
+
+[![Twitter](https://img.shields.io/badge/🐦_Twitter-@bnbgold277983-000000?style=for-the-badge&logo=x)](https://x.com/bnbgold277983)
+[![Discord](https://img.shields.io/badge/💬_Discord-Join_Server-5865F2?style=for-the-badge&logo=discord)](https://discord.com/channels/1316093079090106472)
+
+[![Website](https://img.shields.io/badge/🌐_Website-gemscoin.imperamonad.xyz-00CFFF?style=for-the-badge)](https://gemscoin.imperamonad.xyz)
+
+</div>
+
+---
+
+*GemsRock — Every box is a story. Every gem is a reward. Every opening is forever on-chain.*
+
 </div>
