@@ -9,6 +9,9 @@
 [![ERC-721](https://img.shields.io/badge/NFT-ERC--721-8B00FF?style=for-the-badge&logo=ethereum)](https://etherscan.io/address/0xacCA7801fd5162eB7b0e8d4F62616c8B2e152BC2)
 [![License: MIT](https://img.shields.io/badge/License-MIT-00C853?style=for-the-badge)](LICENSE)
 [![Solidity](https://img.shields.io/badge/Solidity-0.8.x-363636?style=for-the-badge&logo=solidity)](https://soliditylang.org)
+[![Telegram](https://img.shields.io/badge/Telegram-Mini_App-26A5E4?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/gemsrock_bot/RockGems)
+[![Twitter](https://img.shields.io/badge/Twitter-Follow-000000?style=for-the-badge&logo=x&logoColor=white)](https://x.com/bnbgold277983)
+[![Discord](https://img.shields.io/badge/Discord-Join-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.com/channels/1316093079090106472)
 
 **GEMS Token:** `0x49931887171BF46922b2b80Aa834537A80C50B70`  
 **IceBox NFT:** `0xacCA7801fd5162eB7b0e8d4F62616c8B2e152BC2`
