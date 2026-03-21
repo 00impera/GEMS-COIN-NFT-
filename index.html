@@ -696,7 +696,17 @@ async function doOpenBox(){
 /* WALLET */
 async function connectWallet(){
   if(typeof ethers==='undefined'){toast('❌ ethers.js not loaded — reload','err',8000);return;}
-  if(!window.ethereum){toast('⚠ MetaMask not found','err',5000);window.open('https://metamask.io/download/','_blank');return;}
+  if(!window.ethereum){
+    if(/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)){
+      toast('📱 Open in MetaMask mobile browser','info',6000);
+      window.open('https://metamask.app.link/dapp/gemscoin.imperamonad.xyz','_blank');
+      return;
+    } else {
+      toast('⚠ MetaMask not found','err',5000);
+      window.open('https://metamask.io/download/','_blank');
+      return;
+    }
+  }
   document.getElementById('btnConn').disabled=true;
   try{
     const accounts=await window.ethereum.request({method:'eth_requestAccounts'});
