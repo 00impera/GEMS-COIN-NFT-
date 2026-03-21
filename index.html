@@ -2,6 +2,21 @@
 <html lang="en">
 <head>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script>
+(function () {
+  var tg = window.Telegram && window.Telegram.WebApp;
+  if (!tg) return;
+  tg.ready();
+  tg.expand();
+  tg.enableClosingConfirmation();
+  document.documentElement.style.setProperty("--bg", "#04060f");
+  var applyBody = function () {
+    document.body.style.overscrollBehavior = "none";
+    document.body.style.backgroundColor = "#04060f";
+  };
+  document.body ? applyBody() : window.addEventListener("DOMContentLoaded", applyBody);
+})();
+</script>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>GEMSROCK — Ice Box Rewards</title>
