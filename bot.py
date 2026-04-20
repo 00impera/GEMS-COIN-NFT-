@@ -1,5 +1,7 @@
 import os
 import logging
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application, CommandHandler, CallbackQueryHandler, ContextTypes
@@ -12,7 +14,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # ─── CONFIG ──────────────────────────────────────────────
-BOT_TOKEN = os.getenv("BOT_TOKEN")
+BOT_TOKEN       = os.getenv("BOT_TOKEN")
 WEBSITE         = "https://gems-coin-nft.pages.dev"
 GEMS_CONTRACT   = "0x49931887171BF46922b2b80Aa834537A80C50B70"
 ICEBOX_CONTRACT = "0xacCA7801fd5162eB7b0e8d4F62616c8B2e152BC2"
@@ -20,7 +22,22 @@ MONAD_EXPLORER  = "https://monadscan.com"
 MONAD_VISION    = "https://monadvision.com"
 NEAR_EXPLORER   = "https://nearblocks.io"
 
-# ─── BOXES (from App.jsx) ────────────────────────────────
+# ─── HEALTH CHECK SERVER (fixes Render free tier timeout) ─
+class HealthHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"GemsRock Bot OK")
+    def log_message(self, *args):
+        pass
+
+def run_health_server():
+    port = int(os.getenv("PORT", 10000))
+    server = HTTPServer(("0.0.0.0", port), HealthHandler)
+    logger.info(f"Health server on port {port}")
+    server.serve_forever()
+
+# ─── BOXES ───────────────────────────────────────────────
 BOXES = [
     (0,  "Crimson Blaze",  "🔥", "Common",    "0.01", 10),
     (1,  "Sapphire Abyss", "💧", "Common",    "0.01", 10),
@@ -36,7 +53,6 @@ BOXES = [
     (11, "Rainbow Prism",  "🐉", "GODLIKE",   "0.25", 1000),
 ]
 
-# ─── PRIZE TIERS (from App.jsx) ──────────────────────────
 PRIZE_TIERS = [
     ("💨", "Empty",   "No reward · Common drop"),
     ("🥉", "Small",   "Small GEMS payout · Common"),
@@ -46,7 +62,6 @@ PRIZE_TIERS = [
     ("🏆", "Jackpot", "Maximum GEMS · Legendary"),
 ]
 
-# ─── RARITY COLORS (text) ────────────────────────────────
 RARITY_STARS = {
     "Common":    "⚪",
     "Uncommon":  "🟢",
@@ -72,11 +87,6 @@ def main_menu_kb():
          InlineKeyboardButton("👛 Wallet Info", callback_data="wallet")],
         [InlineKeyboardButton("🌐 More Projects", callback_data="projects"),
          InlineKeyboardButton("❓ Help", callback_data="help")],
-    ])
-
-def back_kb():
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("🏠 Main Menu", callback_data="menu")],
     ])
 
 def back_mint_kb():
@@ -107,8 +117,7 @@ async def boxes_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         text += f"{emoji} *Box #{box_id} — {name}*\n"
         text += f"{star} {tier} · {price} MON · 💎 +{gems} GEMS\n\n"
     await msg.reply_text(
-        text,
-        parse_mode="Markdown",
+        text, parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("🧊 Mint IceBox Now", url=WEBSITE)],
             [InlineKeyboardButton("🏠 Main Menu", callback_data="menu")],
@@ -143,8 +152,7 @@ async def tiers_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         text += f"{emoji} *{label.upper()}* — {desc}\n"
     text += "\n✅ 100% on-chain · Provably fair"
     await msg.reply_text(
-        text,
-        parse_mode="Markdown",
+        text, parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("🧊 Try Your Luck", url=WEBSITE)],
             [InlineKeyboardButton("🏠 Main Menu", callback_data="menu")],
@@ -332,8 +340,9 @@ async def button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     elif q.data == "projects":  await projects_cmd(update, ctx)
     elif q.data == "help":      await help_cmd(update, ctx)
 
-# ─── MAIN ─────────────────────────────────────────────────
+# ─── MAIN ────────────────────────────────────────────────
 def main():
+    threading.Thread(target=run_health_server, daemon=True).start()
     app = Application.builder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start",     start))
     app.add_handler(CommandHandler("boxes",     boxes_cmd))
