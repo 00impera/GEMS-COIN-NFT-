@@ -18,6 +18,8 @@ BOT_TOKEN       = os.getenv("BOT_TOKEN")
 WEBSITE         = "https://gems-coin-nft.pages.dev"
 GEMS_CONTRACT   = "0x49931887171BF46922b2b80Aa834537A80C50B70"
 ICEBOX_CONTRACT = "0xacCA7801fd5162eB7b0e8d4F62616c8B2e152BC2"
+NEAR_NFT_ADDR   = "gemsrock-nft.near"
+NEAR_TOKEN_ADDR = "e85f23b81ab3edbdf4c0e5fd889eed50cc2bd465c57c67b71105741ac1b8ceda"
 MONAD_EXPLORER  = "https://monadscan.com"
 MONAD_VISION    = "https://monadvision.com"
 NEAR_EXPLORER   = "https://nearblocks.io"
@@ -77,21 +79,31 @@ def main_menu_kb():
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("🧊 Mint & Open IceBox", url=WEBSITE)],
         [InlineKeyboardButton("🎲 Open Mini App", url="https://t.me/gemsrock_bot/RockGems")],
-        [InlineKeyboardButton("📦 All 12 Boxes", callback_data="boxes"),
-         InlineKeyboardButton("💎 GEMS Token", callback_data="gems")],
-        [InlineKeyboardButton("🏆 Prize Tiers", callback_data="tiers"),
-         InlineKeyboardButton("📜 Contracts", callback_data="contracts")],
-        [InlineKeyboardButton("🔧 How To Mint", callback_data="mint"),
-         InlineKeyboardButton("⇄ Swap / Bridge", callback_data="bridge")],
-        [InlineKeyboardButton("Ⓝ NEAR Wallet", callback_data="near"),
-         InlineKeyboardButton("👛 Wallet Info", callback_data="wallet")],
-        [InlineKeyboardButton("🌐 More Projects", callback_data="projects"),
-         InlineKeyboardButton("❓ Help", callback_data="help")],
+        [InlineKeyboardButton("📦 All 12 Boxes",   callback_data="boxes"),
+         InlineKeyboardButton("💎 GEMS Token",     callback_data="gems")],
+        [InlineKeyboardButton("🏆 Prize Tiers",    callback_data="tiers"),
+         InlineKeyboardButton("📜 Contracts",      callback_data="contracts")],
+        [InlineKeyboardButton("🔧 How To Mint",    callback_data="mint"),
+         InlineKeyboardButton("⇄ Swap / Bridge",   callback_data="bridge")],
+        [InlineKeyboardButton("🔄 NFT Marketplace",callback_data="trade"),
+         InlineKeyboardButton("Ⓝ NEAR Wallet",     callback_data="near")],
+        [InlineKeyboardButton("👛 Wallet Info",     callback_data="wallet"),
+         InlineKeyboardButton("🌐 More Projects",  callback_data="projects")],
+        [InlineKeyboardButton("❓ Help",            callback_data="help")],
     ])
 
 def back_mint_kb():
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("🧊 Mint Now", url=WEBSITE)],
+        [InlineKeyboardButton("🏠 Main Menu", callback_data="menu")],
+    ])
+
+def trade_kb():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("📋 Browse Listings",      url=f"{WEBSITE}/#near")],
+        [InlineKeyboardButton("🛒 Buy NFT Box",          url=f"{WEBSITE}/#near")],
+        [InlineKeyboardButton("💰 Sell / List My NFT",   url=f"{WEBSITE}/#near")],
+        [InlineKeyboardButton("🔍 NEAR NFT Explorer",    url=f"{NEAR_EXPLORER}/nfts/{NEAR_NFT_ADDR}")],
         [InlineKeyboardButton("🏠 Main Menu", callback_data="menu")],
     ])
 
@@ -103,7 +115,8 @@ async def start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         "Mint IceBox NFTs · Open · Claim GEMS\n\n"
         "🌐 " + WEBSITE + "\n"
         "⛓️ Built on Monad Blockchain\n\n"
-        "📦 12 unique boxes · 🏆 6 prize tiers · ✅ 100% on-chain\n\n"
+        "📦 12 unique boxes · 🏆 6 prize tiers · ✅ 100% on-chain\n"
+        "🔄 NFT Marketplace · Ⓝ NEAR cross-chain\n\n"
         "Choose an option below 👇",
         parse_mode="Markdown",
         reply_markup=main_menu_kb()
@@ -119,8 +132,9 @@ async def boxes_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await msg.reply_text(
         text, parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("🧊 Mint IceBox Now", url=WEBSITE)],
-            [InlineKeyboardButton("🏠 Main Menu", callback_data="menu")],
+            [InlineKeyboardButton("🧊 Mint IceBox Now",     url=WEBSITE)],
+            [InlineKeyboardButton("🔄 NFT Marketplace",    callback_data="trade")],
+            [InlineKeyboardButton("🏠 Main Menu",          callback_data="menu")],
         ])
     )
 
@@ -139,9 +153,9 @@ async def gems_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         f"🔍 [View on Explorer]({MONAD_EXPLORER}/address/{GEMS_CONTRACT})",
         parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("📊 MonadVision", url=f"{MONAD_VISION}/token/{GEMS_CONTRACT}")],
-            [InlineKeyboardButton("🎲 Open Mini App", url="https://t.me/gemsrock_bot/RockGems")],
-            [InlineKeyboardButton("🏠 Main Menu", callback_data="menu")],
+            [InlineKeyboardButton("📊 MonadVision",  url=f"{MONAD_VISION}/token/{GEMS_CONTRACT}")],
+            [InlineKeyboardButton("🎲 Open Mini App",url="https://t.me/gemsrock_bot/RockGems")],
+            [InlineKeyboardButton("🏠 Main Menu",    callback_data="menu")],
         ])
     )
 
@@ -155,7 +169,7 @@ async def tiers_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         text, parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("🧊 Try Your Luck", url=WEBSITE)],
-            [InlineKeyboardButton("🏠 Main Menu", callback_data="menu")],
+            [InlineKeyboardButton("🏠 Main Menu",     callback_data="menu")],
         ])
     )
 
@@ -169,13 +183,18 @@ async def contracts_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         "🧊 *IceBox NFT (ERC-721)*\n"
         f"`{ICEBOX_CONTRACT}`\n"
         f"🔍 [MonadVision]({MONAD_VISION}/token/{ICEBOX_CONTRACT})\n\n"
+        "Ⓝ *NEAR Contracts:*\n"
+        f"• NFT: `{NEAR_NFT_ADDR}`\n"
+        f"• Token: `{NEAR_TOKEN_ADDR[:20]}…`\n"
+        f"🔍 [NEAR NFT Explorer]({NEAR_EXPLORER}/nfts/{NEAR_NFT_ADDR})\n\n"
         "✅ Fully automated on-chain payouts\n"
         "⛓️ Chain ID: 143 · Monad Mainnet",
         parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("💎 GEMS Token", url=f"{MONAD_VISION}/token/{GEMS_CONTRACT}")],
-            [InlineKeyboardButton("🖼️ NFT Contract", url=f"{MONAD_VISION}/token/{ICEBOX_CONTRACT}")],
-            [InlineKeyboardButton("🏠 Main Menu", callback_data="menu")],
+            [InlineKeyboardButton("💎 GEMS Token",  url=f"{MONAD_VISION}/token/{GEMS_CONTRACT}")],
+            [InlineKeyboardButton("🖼️ NFT Contract",url=f"{MONAD_VISION}/token/{ICEBOX_CONTRACT}")],
+            [InlineKeyboardButton("Ⓝ NEAR NFT",    url=f"{NEAR_EXPLORER}/nfts/{NEAR_NFT_ADDR}")],
+            [InlineKeyboardButton("🏠 Main Menu",   callback_data="menu")],
         ])
     )
 
@@ -194,9 +213,15 @@ async def mint_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         "• MetaMask · Rabby · Coinbase\n"
         "• WalletConnect · Trust · Phantom\n"
         "• Email / Google / Apple login\n\n"
-        f"🧊 NFT Contract:\n`{ICEBOX_CONTRACT}`",
+        f"🧊 NFT Contract:\n`{ICEBOX_CONTRACT}`\n\n"
+        "💡 *Tip:* After minting, you can also sell your\n"
+        "box on the NFT Marketplace inside the NEAR tab!",
         parse_mode="Markdown",
-        reply_markup=back_mint_kb()
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("🧊 Mint Now",         url=WEBSITE)],
+            [InlineKeyboardButton("🔄 NFT Marketplace",  callback_data="trade")],
+            [InlineKeyboardButton("🏠 Main Menu",        callback_data="menu")],
+        ])
     )
 
 async def bridge_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -213,14 +238,46 @@ async def bridge_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         "• Buy with credit card, Apple Pay, Google Pay\n\n"
         "Ⓝ *NEAR Cross-chain:*\n"
         "• [NEAR Intents](https://near-intents.org)\n"
-        "• Connect NEAR wallet in the NEAR tab\n\n"
+        "• Connect NEAR wallet in the NEAR tab\n"
+        "• Trade NFT boxes cross-chain via Marketplace\n\n"
         "💡 *Tip:* You need MON for gas fees on Monad",
         parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("🌉 Monad Bridge", url="https://monadbridge.com")],
-            [InlineKeyboardButton("⇄ Swap on Website", url=WEBSITE)],
-            [InlineKeyboardButton("🏠 Main Menu", callback_data="menu")],
+            [InlineKeyboardButton("🌉 Monad Bridge",     url="https://monadbridge.com")],
+            [InlineKeyboardButton("⇄ Swap on Website",  url=WEBSITE)],
+            [InlineKeyboardButton("🔄 NFT Marketplace", callback_data="trade")],
+            [InlineKeyboardButton("🏠 Main Menu",       callback_data="menu")],
         ])
+    )
+
+async def trade_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    msg = update.message or update.callback_query.message
+    await msg.reply_text(
+        "🔄 *NFT Marketplace*\n\n"
+        "Buy & sell GemsRock IceBox NFTs directly inside\n"
+        "the *NEAR tab* on the website.\n\n"
+        "📋 *Listings* — Browse active sales\n"
+        "🛒 *Buy* — Market stats + your NEAR NFTs\n"
+        "💰 *Sell* — List your box for a price\n\n"
+        "📌 *How to Buy:*\n"
+        "1️⃣ Connect your EVM wallet (MetaMask etc.)\n"
+        "2️⃣ Open the Ⓝ NEAR tab on the website\n"
+        "3️⃣ Scroll to 🖼️ NFT MARKETPLACE\n"
+        "4️⃣ Pick a listing → 🛒 Buy Now\n"
+        "5️⃣ Confirm transaction in your wallet\n\n"
+        "📌 *How to Sell:*\n"
+        "1️⃣ Connect your NEAR wallet\n"
+        "2️⃣ Open the Ⓝ NEAR tab → Marketplace\n"
+        "3️⃣ Switch to 💰 Sell tab\n"
+        "4️⃣ Select your NFT → Set price in NEAR\n"
+        "5️⃣ Click Ⓝ List on NEAR\n"
+        "6️⃣ Confirm via MyNearWallet\n\n"
+        "💸 Platform fee: 2.5%\n\n"
+        f"🖼️ *NEAR NFT Contract:*\n`{NEAR_NFT_ADDR}`\n"
+        f"🔍 [View on NEAR Explorer]({NEAR_EXPLORER}/nfts/{NEAR_NFT_ADDR})\n\n"
+        "✅ Listings · Buying · Selling all in one place",
+        parse_mode="Markdown",
+        reply_markup=trade_kb()
     )
 
 async def near_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -234,18 +291,26 @@ async def near_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         "• [HOT Wallet](https://hot.tg) — Zero-fee swaps\n"
         "• [Nightly](https://nightly.app) — 105+ chains\n\n"
         "🔗 *How to Connect:*\n"
-        "1️⃣ Go to NEAR tab on the website\n"
+        "1️⃣ Go to Ⓝ NEAR tab on the website\n"
         "2️⃣ Click Connect NEAR Wallet\n"
         "3️⃣ Sign in via MyNearWallet\n"
         "4️⃣ Authorize GEMSROCK access\n"
         "5️⃣ Redirected back automatically\n\n"
+        "✅ *After connecting you get:*\n"
+        "• 💎 GEMS balance on NEAR\n"
+        "• 🖼️ Your NEAR NFT collection\n"
+        "• 🔄 Full NFT Marketplace (buy/sell)\n"
+        "• ↗️ Send GEMS to any NEAR account\n\n"
+        "🖼️ *NFT Contract:* `" + NEAR_NFT_ADDR + "`\n\n"
         "⚠️ Need NEAR for contract deployment?\n"
         "Buy on Binance/Coinbase → ~5 NEAR (~$12)",
         parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("Ⓝ NEAR Tab", url=f"{WEBSITE}/#near")],
-            [InlineKeyboardButton("🔍 NEAR Explorer", url=NEAR_EXPLORER)],
-            [InlineKeyboardButton("🏠 Main Menu", callback_data="menu")],
+            [InlineKeyboardButton("Ⓝ NEAR Tab",          url=f"{WEBSITE}/#near")],
+            [InlineKeyboardButton("🔄 NFT Marketplace",  callback_data="trade")],
+            [InlineKeyboardButton("🔍 NEAR NFT Explorer",url=f"{NEAR_EXPLORER}/nfts/{NEAR_NFT_ADDR}")],
+            [InlineKeyboardButton("🔍 NEAR Explorer",    url=NEAR_EXPLORER)],
+            [InlineKeyboardButton("🏠 Main Menu",        callback_data="menu")],
         ])
     )
 
@@ -268,12 +333,14 @@ async def wallet_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         f"• [Monad Explorer]({MONAD_EXPLORER})\n"
         f"• [MonadVision]({MONAD_VISION})\n"
         f"• [NFT Contract]({MONAD_VISION}/token/{ICEBOX_CONTRACT})\n"
-        f"• [GEMS Token]({MONAD_VISION}/token/{GEMS_CONTRACT})",
+        f"• [GEMS Token]({MONAD_VISION}/token/{GEMS_CONTRACT})\n"
+        f"• [NEAR NFTs]({NEAR_EXPLORER}/nfts/{NEAR_NFT_ADDR})",
         parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("👛 Open Wallet Tab", url=WEBSITE)],
-            [InlineKeyboardButton("📊 MonadVision", url=f"{MONAD_VISION}/token/{GEMS_CONTRACT}")],
-            [InlineKeyboardButton("🏠 Main Menu", callback_data="menu")],
+            [InlineKeyboardButton("👛 Open Wallet Tab",  url=WEBSITE)],
+            [InlineKeyboardButton("🔄 NFT Marketplace", callback_data="trade")],
+            [InlineKeyboardButton("📊 MonadVision",     url=f"{MONAD_VISION}/token/{GEMS_CONTRACT}")],
+            [InlineKeyboardButton("🏠 Main Menu",       callback_data="menu")],
         ])
     )
 
@@ -291,8 +358,9 @@ async def projects_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         "All built on *Monad Mainnet*",
         parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("🧊 IceBox", url=WEBSITE)],
-            [InlineKeyboardButton("🏠 Main Menu", callback_data="menu")],
+            [InlineKeyboardButton("🧊 IceBox",          url=WEBSITE)],
+            [InlineKeyboardButton("🔄 NFT Marketplace", callback_data="trade")],
+            [InlineKeyboardButton("🏠 Main Menu",       callback_data="menu")],
         ])
     )
 
@@ -307,6 +375,7 @@ async def help_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         "/contracts — Contract addresses\n"
         "/mint — How to mint\n"
         "/bridge — Swap & bridge guide\n"
+        "/trade — NFT Marketplace\n"
         "/near — NEAR wallet info\n"
         "/wallet — Wallet overview\n"
         "/projects — All projects\n"
@@ -314,8 +383,9 @@ async def help_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         f"🌐 {WEBSITE}",
         parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("🧊 Open App", url=WEBSITE)],
-            [InlineKeyboardButton("🎲 Mini App", url="https://t.me/gemsrock_bot/RockGems")],
+            [InlineKeyboardButton("🧊 Open App",         url=WEBSITE)],
+            [InlineKeyboardButton("🔄 NFT Marketplace",  callback_data="trade")],
+            [InlineKeyboardButton("🎲 Mini App",         url="https://t.me/gemsrock_bot/RockGems")],
         ])
     )
 
@@ -323,18 +393,18 @@ async def help_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 async def button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
-    if q.data == "menu":
-        await q.message.reply_text(
-            "💎 *GEMSROCK Menu*\n\nChoose an option 👇",
-            parse_mode="Markdown",
-            reply_markup=main_menu_kb()
-        )
+    if   q.data == "menu":      await q.message.reply_text(
+                                    "💎 *GEMSROCK Menu*\n\nChoose an option 👇",
+                                    parse_mode="Markdown",
+                                    reply_markup=main_menu_kb()
+                                )
     elif q.data == "boxes":     await boxes_cmd(update, ctx)
     elif q.data == "gems":      await gems_cmd(update, ctx)
     elif q.data == "tiers":     await tiers_cmd(update, ctx)
     elif q.data == "contracts": await contracts_cmd(update, ctx)
     elif q.data == "mint":      await mint_cmd(update, ctx)
     elif q.data == "bridge":    await bridge_cmd(update, ctx)
+    elif q.data == "trade":     await trade_cmd(update, ctx)
     elif q.data == "near":      await near_cmd(update, ctx)
     elif q.data == "wallet":    await wallet_cmd(update, ctx)
     elif q.data == "projects":  await projects_cmd(update, ctx)
@@ -351,6 +421,7 @@ def main():
     app.add_handler(CommandHandler("contracts", contracts_cmd))
     app.add_handler(CommandHandler("mint",      mint_cmd))
     app.add_handler(CommandHandler("bridge",    bridge_cmd))
+    app.add_handler(CommandHandler("trade",     trade_cmd))
     app.add_handler(CommandHandler("near",      near_cmd))
     app.add_handler(CommandHandler("wallet",    wallet_cmd))
     app.add_handler(CommandHandler("projects",  projects_cmd))
