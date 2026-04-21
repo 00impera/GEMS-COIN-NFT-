@@ -23,6 +23,8 @@ const TOKEN_ADDR      = "0x49931887171BF46922b2b80Aa834537A80C50B70";
 const NFT_ADDR        = "0xacCA7801fd5162eB7b0e8d4F62616c8B2e152BC2";
 const RPC_URL         = "https://monad-mainnet.g.alchemy.com/v2/Uwb7T0DbXMQHjiJBNf9_b005qYjLmJqk";
 const NEAR_TOKEN_ADDR = "e85f23b81ab3edbdf4c0e5fd889eed50cc2bd465c57c67b71105741ac1b8ceda";
+const NEAR_RPC        = "https://rpc.mainnet.near.org";
+const NEAR_APP_KEY    = "gemsrock-near";
 
 const MONAD = defineChain({
   id: 143,
@@ -140,13 +142,6 @@ function poolPct(pool, max) {
   catch { return 0; }
 }
 
-function monadExplorerAddr(address) {
-  return `https://monadscan.com/address/${address}`;
-}
-function monadExplorerTx(hash) {
-  return `https://monadscan.com/tx/${hash}`;
-}
-
 async function resolveTokenImage(nftContract, tokenId) {
   try {
     const uri = await readContract({ contract: nftContract, method: "function tokenURI(uint256 tokenId) view returns (string)", params: [tokenId] });
@@ -157,6 +152,52 @@ async function resolveTokenImage(nftContract, tokenId) {
     const json = await res.json();
     return ipfsToHttp(json.image || json.image_url || "") || null;
   } catch { return null; }
+}
+
+// ─── NEAR RPC HELPERS ────────────────────────────────────
+async function nearRpc(method, params) {
+  const res = await fetch(NEAR_RPC, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: "1", method, params }),
+  });
+  const json = await res.json();
+  if (json.error) throw new Error(json.error.message ?? "NEAR RPC error");
+  return json.result;
+}
+
+async function ftBalanceOf(accountId) {
+  try {
+    const args = btoa(JSON.stringify({ account_id: accountId }));
+    const result = await nearRpc("query", {
+      request_type: "call_function",
+      finality: "final",
+      account_id: NEAR_TOKEN_ADDR,
+      method_name: "ft_balance_of",
+      args_base64: args,
+    });
+    const raw = JSON.parse(String.fromCharCode(...result.result));
+    const n = Number(BigInt(raw) / BigInt(1e14)) / 1e4;
+    return n.toLocaleString("en-US", { maximumFractionDigits: 2 });
+  } catch {
+    return null;
+  }
+}
+
+async function ftMetadata() {
+  try {
+    const args = btoa("{}");
+    const result = await nearRpc("query", {
+      request_type: "call_function",
+      finality: "final",
+      account_id: NEAR_TOKEN_ADDR,
+      method_name: "ft_metadata",
+      args_base64: args,
+    });
+    return JSON.parse(String.fromCharCode(...result.result));
+  } catch {
+    return null;
+  }
 }
 
 // ─── GLOBAL CSS ──────────────────────────────────────────
@@ -652,7 +693,6 @@ function MyBoxItem({ entry, nftContract, onOpen }) {
 }
 
 // ─── TOKEN POOL STATS CARD ───────────────────────────────
-// ✅ FIX: removed iceBoxAddr from destructure and removed IceBox Contract display
 function TokenPoolCard({ tokenStats }) {
   const { maxSupply, rewardPool, publicSupply, ownerReserve, totalSupply } = tokenStats;
   const pct = poolPct(rewardPool, maxSupply);
@@ -689,13 +729,20 @@ function TokenPoolCard({ tokenStats }) {
 }
 
 // ─── NEAR PANEL ──────────────────────────────────────────
-// ✅ FIX: contractId updated + NEAR token address shown after connect
 function NearPanel() {
-  const [nearAcc,   setNearAcc]   = useState(null);
-  const [loading,   setLoading]   = useState(false);
-  const [error,     setError]     = useState("");
-  const [nearReady, setNearReady] = useState(false);
+  const [nearAcc,     setNearAcc]     = useState(null);
+  const [loading,     setLoading]     = useState(false);
+  const [error,       setError]       = useState("");
+  const [nearReady,   setNearReady]   = useState(false);
+  const [gemsBalance, setGemsBalance] = useState(null);
+  const [metadata,    setMetadata]    = useState(null);
+  const [balLoading,  setBalLoading]  = useState(false);
+  const [recipient,   setRecipient]   = useState("");
+  const [amount,      setAmount]      = useState("");
+  const [sending,     setSending]     = useState(false);
+  const [sendMsg,     setSendMsg]     = useState("");
 
+  // load near-api-js
   useEffect(() => {
     if (window.nearApi) { setNearReady(true); return; }
     const script = document.createElement("script");
@@ -707,6 +754,44 @@ function NearPanel() {
     return () => {};
   }, []);
 
+  // auto-reconnect + fetch balance on load
+  useEffect(() => {
+    if (!nearReady || !window.nearApi) return;
+    const { connect, keyStores, WalletConnection } = window.nearApi;
+    const ks  = new keyStores.BrowserLocalStorageKeyStore();
+    const cfg = nearMainnetConfig(ks);
+    connect(cfg).then(near => {
+      const wallet = new WalletConnection(near, NEAR_APP_KEY);
+      if (wallet.isSignedIn()) {
+        const acc = wallet.getAccountId();
+        setNearAcc(acc);
+        loadBalanceAndMeta(acc);
+      }
+    }).catch(() => {});
+  }, [nearReady]);
+
+  function nearMainnetConfig(keyStore) {
+    return {
+      networkId: "mainnet",
+      keyStore,
+      nodeUrl: NEAR_RPC,
+      walletUrl: "https://app.mynearwallet.com",
+      helperUrl: "https://helper.mainnet.near.org",
+      explorerUrl: "https://nearblocks.io",
+    };
+  }
+
+  async function loadBalanceAndMeta(accountId) {
+    setBalLoading(true);
+    const [bal, meta] = await Promise.all([
+      ftBalanceOf(accountId),
+      ftMetadata(),
+    ]);
+    setGemsBalance(bal);
+    setMetadata(meta);
+    setBalLoading(false);
+  }
+
   async function connectNear() {
     if (!nearReady || !window.nearApi) {
       setError("NEAR library not loaded yet. Please wait a moment and try again.");
@@ -715,26 +800,20 @@ function NearPanel() {
     setLoading(true); setError("");
     try {
       const { connect, keyStores, WalletConnection } = window.nearApi;
-      const keyStore = new keyStores.BrowserLocalStorageKeyStore();
-      const config = {
-        networkId: "mainnet",
-        keyStore,
-        nodeUrl: "https://rpc.mainnet.near.org",
-        walletUrl: "https://app.mynearwallet.com",
-        helperUrl: "https://helper.mainnet.near.org",
-        explorerUrl: "https://nearblocks.io",
-      };
-      const near   = await connect(config);
-      const wallet = new WalletConnection(near, "gemsrock-near");
+      const ks  = new keyStores.BrowserLocalStorageKeyStore();
+      const cfg = nearMainnetConfig(ks);
+      const near   = await connect(cfg);
+      const wallet = new WalletConnection(near, NEAR_APP_KEY);
       if (wallet.isSignedIn()) {
-        setNearAcc(wallet.getAccountId());
+        const acc = wallet.getAccountId();
+        setNearAcc(acc);
+        loadBalanceAndMeta(acc);
         setLoading(false);
         return;
       }
-      // ✅ FIX: contractId updated to deployed NEAR token
       await wallet.requestSignIn({
         contractId: NEAR_TOKEN_ADDR,
-        methodNames: [],
+        methodNames: ["ft_transfer", "ft_transfer_call"],
         successUrl: window.location.href,
         failureUrl: window.location.href,
       });
@@ -748,36 +827,66 @@ function NearPanel() {
     if (!window.nearApi) return;
     try {
       const { connect, keyStores, WalletConnection } = window.nearApi;
-      const keyStore = new keyStores.BrowserLocalStorageKeyStore();
-      const config = { networkId:"mainnet", keyStore, nodeUrl:"https://rpc.mainnet.near.org", walletUrl:"https://app.mynearwallet.com" };
-      connect(config).then(near => {
-        const wallet = new WalletConnection(near, "gemsrock-near");
+      const ks  = new keyStores.BrowserLocalStorageKeyStore();
+      const cfg = nearMainnetConfig(ks);
+      connect(cfg).then(near => {
+        const wallet = new WalletConnection(near, NEAR_APP_KEY);
         wallet.signOut();
         setNearAcc(null);
+        setGemsBalance(null);
+        setMetadata(null);
       });
     } catch {}
   }
 
-  useEffect(() => {
-    if (!nearReady || !window.nearApi) return;
-    const { connect, keyStores, WalletConnection } = window.nearApi;
-    const keyStore = new keyStores.BrowserLocalStorageKeyStore();
-    const config = {
-      networkId: "mainnet", keyStore,
-      nodeUrl: "https://rpc.mainnet.near.org",
-      walletUrl: "https://app.mynearwallet.com",
-    };
-    connect(config).then(near => {
-      const wallet = new WalletConnection(near, "gemsrock-near");
-      if (wallet.isSignedIn()) setNearAcc(wallet.getAccountId());
-    }).catch(() => {});
-  }, [nearReady]);
+  async function sendTransfer() {
+    if (!recipient || !amount || !window.nearApi) return;
+    setSending(true); setSendMsg("");
+    try {
+      const { connect, keyStores, WalletConnection } = window.nearApi;
+      const ks  = new keyStores.BrowserLocalStorageKeyStore();
+      const cfg = nearMainnetConfig(ks);
+      const near   = await connect(cfg);
+      const wallet = new WalletConnection(near, NEAR_APP_KEY);
+      if (!wallet.isSignedIn()) { setSendMsg("Wallet not connected."); setSending(false); return; }
+      const account = wallet.account();
+      // 18 decimals
+      const amountYocto = (BigInt(Math.round(parseFloat(amount) * 1e4)) * BigInt(1e14)).toString();
+      await account.functionCall({
+        contractId: NEAR_TOKEN_ADDR,
+        methodName: "ft_transfer",
+        args: { receiver_id: recipient, amount: amountYocto, memo: "GemsRock transfer" },
+        gas: "30000000000000",
+        attachedDeposit: "1",
+      });
+      setSendMsg("✅ Transfer sent!");
+      setRecipient("");
+      setAmount("");
+      loadBalanceAndMeta(nearAcc);
+    } catch(e) {
+      setSendMsg("❌ " + (e?.message ?? "Transfer failed").slice(0, 80));
+    }
+    setSending(false);
+  }
+
+  const inputStyle = {
+    width: "100%",
+    padding: "9px 12px",
+    background: "#07090f",
+    border: "1px solid #1e1e30",
+    borderRadius: 9,
+    color: "#e0e0ee",
+    fontFamily: "'Courier New', monospace",
+    fontSize: 12,
+    marginBottom: 8,
+    outline: "none",
+  };
 
   return (
     <div className="panel">
       <div className="panel-title">Ⓝ NEAR Wallet</div>
       <p style={{ color:"#555", marginBottom:22, fontSize:13 }}>
-        Connect your NEAR account for cross-chain GEMSROCK interactions.
+        Connect your NEAR account to view and transfer GEMS on the NEAR network.
       </p>
 
       {!nearReady && !error && (
@@ -787,21 +896,102 @@ function NearPanel() {
       )}
 
       {nearAcc ? (
-        <div style={{ background:"#0b0b16", borderRadius:13, padding:20, textAlign:"center" }}>
-          <div style={{ color:"#00ff88", fontWeight:800, fontSize:17, marginBottom:7 }}>✅ Connected</div>
-          <div style={{ color:"#00c9a7", fontFamily:"monospace", fontSize:13, marginBottom:6 }}>{nearAcc}</div>
-          <a href={`https://nearblocks.io/address/${nearAcc}`} target="_blank" rel="noreferrer"
-            style={{ display:"block", color:"#444", fontSize:11, marginBottom:8 }}>
-            🔍 View on NEAR Explorer ↗
-          </a>
-          {/* ✅ FIX: NEAR GEMS token address shown */}
-          <div style={{ fontSize:10, color:"#444", marginBottom:16, fontFamily:"monospace" }}>
-            Ⓝ GEMS Token: {NEAR_TOKEN_ADDR.slice(0,12)}…{NEAR_TOKEN_ADDR.slice(-6)}
+        <>
+          {/* ── connected card ── */}
+          <div style={{ background:"#0b0b16", borderRadius:13, padding:20, marginBottom:18 }}>
+            <div style={{ color:"#00ff88", fontWeight:800, fontSize:15, marginBottom:6 }}>✅ Connected</div>
+            <div style={{ color:"#00c9a7", fontFamily:"monospace", fontSize:13, marginBottom:8, wordBreak:"break-all" }}>
+              {nearAcc}
+            </div>
+            <a href={`https://nearblocks.io/address/${nearAcc}`} target="_blank" rel="noreferrer"
+              style={{ display:"block", color:"#444", fontSize:11, marginBottom:12 }}>
+              🔍 View on NEAR Explorer ↗
+            </a>
+
+            {/* token balance row */}
+            <div style={{ display:"flex", alignItems:"center", gap:14, background:"#07090f", borderRadius:9, padding:"10px 14px", marginBottom:10 }}>
+              <span style={{ fontSize:22 }}>💎</span>
+              <div>
+                <div style={{ fontSize:18, fontWeight:900, color:"#FFD700" }}>
+                  {balLoading ? "…" : (gemsBalance ?? "—")} GEMS
+                </div>
+                {metadata && (
+                  <div style={{ fontSize:10, color:"#444", marginTop:2, letterSpacing:1 }}>
+                    {metadata.name} · {metadata.symbol} · decimals {metadata.decimals}
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={() => loadBalanceAndMeta(nearAcc)}
+                style={{ marginLeft:"auto", background:"none", border:"1px solid #1e1e30", borderRadius:8, color:"#444", padding:"4px 10px", fontSize:11, cursor:"pointer" }}
+              >
+                ↻
+              </button>
+            </div>
+
+            {/* contract address */}
+            <div style={{ fontSize:10, color:"#333", fontFamily:"monospace", marginBottom:12 }}>
+              Contract: {NEAR_TOKEN_ADDR.slice(0,14)}…{NEAR_TOKEN_ADDR.slice(-8)}
+            </div>
+
+            <a href={`https://nearblocks.io/token/${NEAR_TOKEN_ADDR}`} target="_blank" rel="noreferrer"
+              style={{ display:"inline-block", fontSize:11, color:"#00c9a7", marginBottom:14, border:"1px solid #00c9a722", borderRadius:8, padding:"4px 10px" }}>
+              📊 View token on NEAR Explorer ↗
+            </a>
+
+            <button className="mint-btn"
+              style={{ background:"#ff4444", color:"#fff", width:"auto", padding:"8px 24px", marginTop:0 }}
+              onClick={disconnectNear}>
+              Disconnect
+            </button>
           </div>
-          <button className="mint-btn" style={{ background:"#ff4444", color:"#fff", width:"auto", padding:"8px 24px" }} onClick={disconnectNear}>
-            Disconnect
-          </button>
-        </div>
+
+          {/* ── transfer panel ── */}
+          <div style={{ background:"#0b0b16", borderRadius:13, padding:18 }}>
+            <div style={{ fontSize:11, color:"#555", letterSpacing:2, marginBottom:12, fontWeight:700 }}>
+              SEND GEMS (NEAR)
+            </div>
+            <input
+              style={inputStyle}
+              placeholder="Recipient NEAR account (e.g. alice.near)"
+              value={recipient}
+              onChange={e => setRecipient(e.target.value)}
+            />
+            <div style={{ position:"relative" }}>
+              <input
+                style={{ ...inputStyle, paddingRight:55 }}
+                placeholder="Amount"
+                type="number"
+                min="0"
+                step="any"
+                value={amount}
+                onChange={e => setAmount(e.target.value)}
+              />
+              <span style={{ position:"absolute", right:12, top:"50%", transform:"translateY(-70%)", fontSize:11, color:"#555" }}>GEMS</span>
+            </div>
+            <button
+              className="mint-btn"
+              style={{ background:sending?"#1e1e30":"#00c9a7", color:sending?"#555":"#000", marginTop:4 }}
+              disabled={sending || !recipient || !amount}
+              onClick={sendTransfer}
+            >
+              {sending ? "⏳ Sending…" : "Ⓝ Send GEMS"}
+            </button>
+            {sendMsg && (
+              <div style={{
+                marginTop:10, fontSize:12, padding:"8px 12px", borderRadius:8,
+                background:sendMsg.startsWith("✅")?"#00ff8811":"#ff444411",
+                color:sendMsg.startsWith("✅")?"#00ff88":"#ff8888",
+                border:`1px solid ${sendMsg.startsWith("✅")?"#00ff8833":"#ff444433"}`,
+              }}>
+                {sendMsg}
+              </div>
+            )}
+            <div style={{ fontSize:10, color:"#333", marginTop:8, lineHeight:1.6 }}>
+              Note: ft_transfer requires a 1 yoctoNEAR security deposit. Your NEAR wallet will prompt you to confirm.
+            </div>
+          </div>
+        </>
       ) : (
         nearReady && (
           <>
@@ -810,13 +1000,41 @@ function NearPanel() {
                 {loading ? "⏳ Connecting…" : "Ⓝ Connect NEAR Wallet"}
               </button>
             </div>
-            <div style={{ background:"#0b0b16", borderRadius:11, padding:14, fontSize:11, color:"#444", lineHeight:1.7 }}>
+
+            {/* token preview (no wallet needed) */}
+            <div style={{ background:"#0b0b16", borderRadius:11, padding:14, marginBottom:14 }}>
+              <div style={{ fontSize:11, color:"#555", letterSpacing:2, marginBottom:10, fontWeight:700 }}>
+                GEMS TOKEN (NEAR)
+              </div>
+              <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                <span style={{ fontSize:22 }}>💎</span>
+                <div>
+                  <div style={{ fontWeight:800, fontSize:14, color:"#FFD700" }}>GemsRock · GEMS</div>
+                  <div style={{ fontSize:11, color:"#444", fontFamily:"monospace", marginTop:2 }}>
+                    {NEAR_TOKEN_ADDR.slice(0,18)}…
+                  </div>
+                </div>
+              </div>
+              <div style={{ marginTop:10, display:"flex", gap:8 }}>
+                <a href={`https://nearblocks.io/token/${NEAR_TOKEN_ADDR}`} target="_blank" rel="noreferrer"
+                  style={{ fontSize:11, color:"#00c9a7", border:"1px solid #00c9a722", borderRadius:8, padding:"4px 10px" }}>
+                  NEAR Explorer ↗
+                </a>
+                <a href="https://app.ref.finance/" target="_blank" rel="noreferrer"
+                  style={{ fontSize:11, color:"#4488ff", border:"1px solid #4488ff22", borderRadius:8, padding:"4px 10px" }}>
+                  Ref.Finance ↗
+                </a>
+              </div>
+            </div>
+
+            <div style={{ background:"#0b0b16", borderRadius:11, padding:14, fontSize:11, color:"#444", lineHeight:1.8 }}>
               <div style={{ color:"#555", marginBottom:6, fontWeight:700 }}>How it works:</div>
               <div>1. Click above to open MyNearWallet in a new tab</div>
               <div>2. Sign in or create a NEAR account</div>
-              <div>3. Authorize GEMSROCK access</div>
+              <div>3. Authorize ft_transfer access for GEMS</div>
               <div>4. You'll be redirected back here automatically</div>
             </div>
+
             {error && (
               <div style={{ color:"#ff9900", background:"#0b0b16", padding:12, borderRadius:9, marginTop:13, fontSize:11, whiteSpace:"pre-wrap", border:"1px solid #ff990033" }}>
                 ⚠️ {error}
