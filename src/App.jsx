@@ -18,11 +18,11 @@ import {
 import { createWallet, walletConnect, inAppWallet } from "thirdweb/wallets";
 
 // ─── CONFIG ──────────────────────────────────────────────
-const CLIENT_ID  = "821819db832d1a313ae3b1a62fbeafb7";
-const TOKEN_ADDR = "0x49931887171BF46922b2b80Aa834537A80C50B70";
-const NFT_ADDR   = "0xacCA7801fd5162eB7b0e8d4F62616c8B2e152BC2";
-const RPC_URL    = "https://monad-mainnet.g.alchemy.com/v2/Uwb7T0DbXMQHjiJBNf9_b005qYjLmJqk";
-const NEAR_JWT   = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IjIwMjUtMDEtMTItdjEifQ.eyJ2IjoxLCJrZXlfdHlwZSI6ImRpc3RyaWJ1dGlvbl9jaGFubmVsIiwicGFydG5lcl9pZCI6ImNyeXB0b2Nhc2gtbmZ0IiwiaWF0IjoxNzczMDc3MzExLCJleHAiOjE4MDQ2MTMzMTF9.Wi55S8cwVmAXPtOG0ymr7ldX-5CXVygzuanbjAAJHP-Am14_52C6i4cQG5FvjcAorw0KD8k8JD_YX5AM4QKhNqYtU5gsI4-KKe0KavO5_69NowzUKc_ubtjYn85eFjWskzZQvICMqSZkdGOSnMT_hNEePA8qYi_wSov4a4bQh4zIfNA0znEdDIV3rGI_bDM9dgOk0PnJRIpwi_aXOQ8Q4e50IO2UMrZEDtBVmUhK5-Mno3S_iS7tZl4QSui_4_bNCapQolFwUPB9Zqyxay_6rPVEr7j-8Ez5-htwkR5ZYvTb1mJaj3DVPpWPL9QTxhjvhbJ7nKrWpibcWX3AVoXZ6g";
+const CLIENT_ID       = "821819db832d1a313ae3b1a62fbeafb7";
+const TOKEN_ADDR      = "0x49931887171BF46922b2b80Aa834537A80C50B70";
+const NFT_ADDR        = "0xacCA7801fd5162eB7b0e8d4F62616c8B2e152BC2";
+const RPC_URL         = "https://monad-mainnet.g.alchemy.com/v2/Uwb7T0DbXMQHjiJBNf9_b005qYjLmJqk";
+const NEAR_TOKEN_ADDR = "e85f23b81ab3edbdf4c0e5fd889eed50cc2bd465c57c67b71105741ac1b8ceda";
 
 const MONAD = defineChain({
   id: 143,
@@ -118,16 +118,13 @@ const BOXES_RAW = [
 const BOXES = BOXES_RAW.map(b => ({ ...b }));
 
 // ─── FORMAT HELPERS ──────────────────────────────────────
-// GEMS has 18 decimals — use locale with space separator to avoid "dots" confusion
 function fmtGems(wei) {
   if (wei === undefined || wei === null) return "—";
   try {
     const n = Number(BigInt(wei) / BigInt(1e14)) / 1e4;
-    // Use en-US with commas (not dots) as thousands separator
     return n.toLocaleString("en-US", { maximumFractionDigits: 2 });
   } catch { return "—"; }
 }
-// Compact large numbers: 1000000 → 1M
 function fmtSupply(wei) {
   if (wei === undefined || wei === null) return "—";
   try {
@@ -137,14 +134,12 @@ function fmtSupply(wei) {
     return n.toLocaleString("en-US");
   } catch { return "—"; }
 }
-// Pool fill %
 function poolPct(pool, max) {
   if (!pool || !max) return 0;
   try { return Math.min(100, Math.round(Number((BigInt(pool) * 100n) / BigInt(max)))); }
   catch { return 0; }
 }
 
-// ─── MONAD EXPLORER LINK (fixed URL format) ──────────────
 function monadExplorerAddr(address) {
   return `https://monadscan.com/address/${address}`;
 }
@@ -152,7 +147,6 @@ function monadExplorerTx(hash) {
   return `https://monadscan.com/tx/${hash}`;
 }
 
-// ─── RESOLVE TOKEN IMAGE ─────────────────────────────────
 async function resolveTokenImage(nftContract, tokenId) {
   try {
     const uri = await readContract({ contract: nftContract, method: "function tokenURI(uint256 tokenId) view returns (string)", params: [tokenId] });
@@ -291,7 +285,6 @@ a{text-decoration:none;}
 .pool-bar{height:100%;border-radius:8px;transition:width .8s ease;
   background:linear-gradient(90deg,#00e676,#00e5ff);}
 
-/* Near connect button styles */
 .near-connect-btn{display:flex;align-items:center;justify-content:center;gap:10px;
   width:100%;max-width:340px;padding:14px 28px;border-radius:12px;border:none;
   background:linear-gradient(135deg,#00c9a7,#00887a);color:#000;
@@ -403,12 +396,11 @@ function useTokenStats(tokenContract) {
   const { data: rewardPool   } = useReadContract({ contract:tokenContract, method:"function BOX_REWARD_POOL() view returns (uint256)", params:[] });
   const { data: publicSupply } = useReadContract({ contract:tokenContract, method:"function PUBLIC_SUPPLY() view returns (uint256)",   params:[] });
   const { data: ownerReserve } = useReadContract({ contract:tokenContract, method:"function OWNER_RESERVE() view returns (uint256)",   params:[] });
-  const { data: iceBoxAddr   } = useReadContract({ contract:tokenContract, method:"function iceBoxContract() view returns (address)",  params:[] });
   const { data: totalSupply  } = useReadContract({ contract:tokenContract, method:"function totalSupply() view returns (uint256)",     params:[] });
-  return { maxSupply, rewardPool, publicSupply, ownerReserve, iceBoxAddr, totalSupply };
+  return { maxSupply, rewardPool, publicSupply, ownerReserve, totalSupply };
 }
 
-// ─── HOOK: owned boxes via eth_getLogs (with pagination to handle free tier limit) ───────────────────
+// ─── HOOK: owned boxes ───────────────────────────────────
 function useOwnedBoxes(nftContract, account) {
   const [chainBoxes, setChainBoxes] = useState([]);
 
@@ -417,7 +409,6 @@ function useOwnedBoxes(nftContract, account) {
     let cancelled = false;
 
     async function fetchLogsInChunks(fromBlock, toBlock, paddedAddr, TRANSFER_TOPIC) {
-      // Chunk size of 500 blocks to stay well within free-tier limits
       const CHUNK = 500;
       const allLogs = [];
       let current = fromBlock;
@@ -442,17 +433,13 @@ function useOwnedBoxes(nftContract, account) {
       try {
         const paddedAddr     = account.address.toLowerCase().replace("0x","").padStart(64,"0");
         const TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
-
-        // Get latest block number first
         const blockResp = await window.fetch(RPC_URL, {
           method:"POST", headers:{"Content-Type":"application/json"},
           body:JSON.stringify({ jsonrpc:"2.0", id:2, method:"eth_blockNumber", params:[] }),
         });
         const blockData = await blockResp.json();
         const latestBlock = parseInt(blockData.result, 16);
-
         const logs = await fetchLogsInChunks(1, latestBlock, paddedAddr, TRANSFER_TOPIC);
-
         const tokenIds = [...new Set(logs.map(l => BigInt(l.topics[3])))];
         const owned    = [];
         for (const tokenId of tokenIds) {
@@ -665,8 +652,9 @@ function MyBoxItem({ entry, nftContract, onOpen }) {
 }
 
 // ─── TOKEN POOL STATS CARD ───────────────────────────────
+// ✅ FIX: removed iceBoxAddr from destructure and removed IceBox Contract display
 function TokenPoolCard({ tokenStats }) {
-  const { maxSupply, rewardPool, publicSupply, ownerReserve, iceBoxAddr, totalSupply } = tokenStats;
+  const { maxSupply, rewardPool, publicSupply, ownerReserve, totalSupply } = tokenStats;
   const pct = poolPct(rewardPool, maxSupply);
   const rows = [
     { label:"Max Supply",    value:fmtSupply(maxSupply)    + " GEMS", color:"#FFD700" },
@@ -696,28 +684,18 @@ function TokenPoolCard({ tokenStats }) {
           </div>
         ))}
       </div>
-      {iceBoxAddr && iceBoxAddr !== "0x0000000000000000000000000000000000000000" && (
-        <div style={{ marginTop:12, fontSize:10, color:"#333" }}>
-          IceBox Contract:{" "}
-          <a href={monadExplorerAddr(iceBoxAddr)} target="_blank" rel="noreferrer"
-            style={{ color:"#555", fontFamily:"monospace" }}>
-            {iceBoxAddr.slice(0,10)}…{iceBoxAddr.slice(-6)}
-          </a>
-        </div>
-      )}
     </div>
   );
 }
 
-// ─── NEAR PANEL (fixed — no npm packages required) ───────
-// Uses near-api-js from CDN via dynamic script injection
+// ─── NEAR PANEL ──────────────────────────────────────────
+// ✅ FIX: contractId updated + NEAR token address shown after connect
 function NearPanel() {
-  const [nearAcc,  setNearAcc]  = useState(null);
-  const [loading,  setLoading]  = useState(false);
-  const [error,    setError]    = useState("");
+  const [nearAcc,   setNearAcc]   = useState(null);
+  const [loading,   setLoading]   = useState(false);
+  const [error,     setError]     = useState("");
   const [nearReady, setNearReady] = useState(false);
 
-  // Dynamically load near-api-js from CDN
   useEffect(() => {
     if (window.nearApi) { setNearReady(true); return; }
     const script = document.createElement("script");
@@ -748,20 +726,18 @@ function NearPanel() {
       };
       const near   = await connect(config);
       const wallet = new WalletConnection(near, "gemsrock-near");
-
       if (wallet.isSignedIn()) {
         setNearAcc(wallet.getAccountId());
         setLoading(false);
         return;
       }
-      // Redirect to NEAR wallet for sign-in
+      // ✅ FIX: contractId updated to deployed NEAR token
       await wallet.requestSignIn({
-        contractId: "gemsrock.near",
+        contractId: NEAR_TOKEN_ADDR,
         methodNames: [],
         successUrl: window.location.href,
         failureUrl: window.location.href,
       });
-      // requestSignIn redirects — code below only runs on return
     } catch(e) {
       setError("Connection error: " + (e?.message ?? "Unknown error"));
     }
@@ -782,7 +758,6 @@ function NearPanel() {
     } catch {}
   }
 
-  // Check if returning from NEAR wallet sign-in
   useEffect(() => {
     if (!nearReady || !window.nearApi) return;
     const { connect, keyStores, WalletConnection } = window.nearApi;
@@ -816,9 +791,13 @@ function NearPanel() {
           <div style={{ color:"#00ff88", fontWeight:800, fontSize:17, marginBottom:7 }}>✅ Connected</div>
           <div style={{ color:"#00c9a7", fontFamily:"monospace", fontSize:13, marginBottom:6 }}>{nearAcc}</div>
           <a href={`https://nearblocks.io/address/${nearAcc}`} target="_blank" rel="noreferrer"
-            style={{ display:"block", color:"#444", fontSize:11, marginBottom:16 }}>
+            style={{ display:"block", color:"#444", fontSize:11, marginBottom:8 }}>
             🔍 View on NEAR Explorer ↗
           </a>
+          {/* ✅ FIX: NEAR GEMS token address shown */}
+          <div style={{ fontSize:10, color:"#444", marginBottom:16, fontFamily:"monospace" }}>
+            Ⓝ GEMS Token: {NEAR_TOKEN_ADDR.slice(0,12)}…{NEAR_TOKEN_ADDR.slice(-6)}
+          </div>
           <button className="mint-btn" style={{ background:"#ff4444", color:"#fff", width:"auto", padding:"8px 24px" }} onClick={disconnectNear}>
             Disconnect
           </button>
@@ -850,31 +829,15 @@ function NearPanel() {
   );
 }
 
-// ─── SWAP / BRIDGE PANEL (fixed bridge cards) ────────────
+// ─── SWAP / BRIDGE PANEL ─────────────────────────────────
 function SwapBridgePanel({ account }) {
   const [mode, setMode] = useState("swap");
 
   const bridges = [
-    {
-      name:"Monad Bridge", url:"https://monadbridge.com/",
-      icon:"🌉", desc:"Official Monad bridge",
-      color:"#836ef9",
-    },
-    {
-      name:"NEAR Intents", url:"https://near-intents.org",
-      icon:"Ⓝ", desc:"NEAR cross-chain intents",
-      color:"#00c9a7",
-    },
-    {
-      name:"Rhino.fi", url:"https://app.rhino.fi",
-      icon:"🦏", desc:"Multi-chain bridge",
-      color:"#00e5ff",
-    },
-    {
-      name:"Stargate", url:"https://stargate.finance",
-      icon:"⭐", desc:"LayerZero powered bridge",
-      color:"#ffaa00",
-    },
+    { name:"Monad Bridge", url:"https://monadbridge.com/",    icon:"🌉", desc:"Official Monad bridge",        color:"#836ef9" },
+    { name:"NEAR Intents", url:"https://near-intents.org",    icon:"Ⓝ",  desc:"NEAR cross-chain intents",     color:"#00c9a7" },
+    { name:"Rhino.fi",     url:"https://app.rhino.fi",        icon:"🦏", desc:"Multi-chain bridge",           color:"#00e5ff" },
+    { name:"Stargate",     url:"https://stargate.finance",    icon:"⭐", desc:"LayerZero powered bridge",     color:"#ffaa00" },
   ];
 
   function openBridge(url) {
@@ -893,33 +856,18 @@ function SwapBridgePanel({ account }) {
           </button>
         ))}
       </div>
-
       {mode==="swap" && (account
         ? <PayEmbed client={client} payOptions={{ mode:"fund_wallet", prefillBuy:{ chain:MONAD, token:{ address:TOKEN_ADDR, name:"GEMS", symbol:"GEMS", decimals:18 }, allowEdits:{ amount:true, token:false, chain:false } } }} theme="dark" style={{ width:"100%", maxWidth:440, margin:"0 auto", display:"block" }}/>
         : <div style={{ textAlign:"center", padding:"44px 20px", color:"#333" }}>🔌 Connect wallet to swap</div>
       )}
-
       {mode==="bridge" && (
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:13 }}>
           {bridges.map(b=>(
-            <div
-              key={b.name}
-              className="bridge-card"
-              onClick={() => openBridge(b.url)}
-              role="button"
-              tabIndex={0}
-              onKeyDown={e => e.key==="Enter" && openBridge(b.url)}
-              style={{ "--bridge-color": b.color }}
-            >
+            <div key={b.name} className="bridge-card" onClick={() => openBridge(b.url)} role="button" tabIndex={0} onKeyDown={e => e.key==="Enter" && openBridge(b.url)}>
               <div style={{ fontSize:32, marginBottom:8 }}>{b.icon}</div>
               <div style={{ fontWeight:800, color:"#ccc", fontSize:14, marginBottom:4 }}>{b.name}</div>
               <div style={{ color:"#444", fontSize:12, marginBottom:10 }}>{b.desc}</div>
-              <div style={{
-                display:"inline-flex", alignItems:"center", gap:6,
-                fontSize:11, color:b.color, fontWeight:700,
-                padding:"4px 10px", borderRadius:99,
-                background: b.color+"18", border:`1px solid ${b.color}44`,
-              }}>
+              <div style={{ display:"inline-flex", alignItems:"center", gap:6, fontSize:11, color:b.color, fontWeight:700, padding:"4px 10px", borderRadius:99, background:b.color+"18", border:`1px solid ${b.color}44` }}>
                 Open ↗
               </div>
             </div>
@@ -944,7 +892,7 @@ function BuyPanel({ account }) {
   );
 }
 
-// ─── WALLET PANEL (fixed explorer links) ─────────────────
+// ─── WALLET PANEL ────────────────────────────────────────
 function WalletPanel({ account, balance, myBoxes, opened, totalNftMinted, tokenStats }) {
   const userStats = [
     { label:"GEMS Balance",  value:fmtGems(balance)+" 💎", color:"#00ff88" },
@@ -970,10 +918,7 @@ function WalletPanel({ account, balance, myBoxes, opened, totalNftMinted, tokenS
             ))}
           </div>
           <TokenPoolCard tokenStats={tokenStats}/>
-
-          {/* ✅ FIXED: Explorer links */}
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
-            {/* ✅ monadscan.com/address/<wallet> */}
             <a href={`https://monadscan.com/address/${account.address}`}
               target="_blank" rel="noreferrer"
               style={{ display:"block", textAlign:"center", padding:"9px 0", border:"1px solid #1e1e30", borderRadius:9, color:"#555", fontSize:12, transition:".2s" }}
@@ -981,7 +926,6 @@ function WalletPanel({ account, balance, myBoxes, opened, totalNftMinted, tokenS
               onMouseLeave={e=>e.currentTarget.style.borderColor="#1e1e30"}>
               🔍 Monad Explorer
             </a>
-            {/* ✅ monadvision.com/token/<wallet> */}
             <a href={`https://monadvision.com/token/${account.address}`}
               target="_blank" rel="noreferrer"
               style={{ display:"block", textAlign:"center", padding:"9px 0", border:"1px solid #1e1e30", borderRadius:9, color:"#555", fontSize:12, transition:".2s" }}
@@ -990,10 +934,7 @@ function WalletPanel({ account, balance, myBoxes, opened, totalNftMinted, tokenS
               📊 MonadVision
             </a>
           </div>
-
-          {/* ✅ FIXED: NFT + GEMS Token contract links */}
           <div style={{ marginTop:12, display:"flex", gap:10 }}>
-            {/* ✅ https://monadvision.com/token/0xacCA7801fd5162eB7b0e8d4F62616c8B2e152BC2 */}
             <a href={`https://monadvision.com/token/${NFT_ADDR}`}
               target="_blank" rel="noreferrer"
               style={{ flex:1, display:"block", textAlign:"center", padding:"9px 0", border:"1px solid #1e1e30", borderRadius:9, color:"#555", fontSize:11, transition:".2s" }}
@@ -1001,7 +942,6 @@ function WalletPanel({ account, balance, myBoxes, opened, totalNftMinted, tokenS
               onMouseLeave={e=>e.currentTarget.style.borderColor="#1e1e30"}>
               🖼️ NFT Contract
             </a>
-            {/* ✅ https://monadvision.com/token/0x49931887171BF46922b2b80Aa834537A80C50B70 */}
             <a href={`https://monadvision.com/token/${TOKEN_ADDR}`}
               target="_blank" rel="noreferrer"
               style={{ flex:1, display:"block", textAlign:"center", padding:"9px 0", border:"1px solid #1e1e30", borderRadius:9, color:"#555", fontSize:11, transition:".2s" }}
@@ -1017,6 +957,7 @@ function WalletPanel({ account, balance, myBoxes, opened, totalNftMinted, tokenS
     </div>
   );
 }
+
 // ─── APP INNER ───────────────────────────────────────────
 function AppInner() {
   const [tab,        setTab]        = useState("icebox");
@@ -1025,13 +966,13 @@ function AppInner() {
   const [openingBox, setOpeningBox] = useState(null);
   const [opened,     setOpened]     = useState(0);
   const [gemsPopup,  setGemsPopup]  = useState(null);
- 
+
   const { toasts, toast } = useToasts();
- 
+
   const account       = useActiveAccount();
   const tokenContract = getContract({ client, chain:MONAD, address:TOKEN_ADDR });
   const nftContract   = getContract({ client, chain:MONAD, address:NFT_ADDR   });
- 
+
   const { data: balance } = useReadContract({
     contract: tokenContract,
     method: "function balanceOf(address) view returns (uint256)",
@@ -1042,18 +983,18 @@ function AppInner() {
     method: "function totalSupply() view returns (uint256)",
     params: [],
   });
- 
-  const boxPrice    = useBoxPrice(nftContract);
-  const tokenStats  = useTokenStats(tokenContract);
-  const chainBoxes  = useOwnedBoxes(nftContract, account);
- 
+
+  const boxPrice   = useBoxPrice(nftContract);
+  const tokenStats = useTokenStats(tokenContract);
+  const chainBoxes = useOwnedBoxes(nftContract, account);
+
   const allBoxes = [
     ...chainBoxes.filter(c => !myBoxes.some(m => m.tokenId?.toString() === c.tokenId?.toString())),
     ...myBoxes,
   ];
- 
+
   const { mutate: sendTx } = useSendTransaction();
- 
+
   function handleMint(box) {
     if (!account) return;
     const value = boxPrice != null ? boxPrice : toWei(box.price);
@@ -1082,7 +1023,7 @@ function AppInner() {
       },
     });
   }
- 
+
   function handleOpen(entry) { setOpeningBox(entry); }
   function handleOpenClose() {
     if (openingBox) {
@@ -1091,10 +1032,10 @@ function AppInner() {
     }
     setOpeningBox(null);
   }
- 
+
   const gems           = fmtGems(balance);
   const totalNftMinted = nftTotalSupply ? Number(nftTotalSupply) : 0;
- 
+
   const TABS = [
     { id:"icebox", label:"🧊 Ice Box"      },
     { id:"buy",    label:"💳 Buy / Card"   },
@@ -1102,12 +1043,11 @@ function AppInner() {
     { id:"near",   label:"Ⓝ NEAR"          },
     { id:"wallet", label:"👛 Wallet"        },
   ];
- 
+
   return (
     <div style={{ minHeight:"100vh", background:"#07090f", color:"#e0e0ee" }}>
       <style>{GLOBAL_CSS}</style>
- 
-      {/* HEADER */}
+
       <header style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"14px 28px", borderBottom:"1px solid #161625", background:"rgba(7,9,15,.97)", backdropFilter:"blur(16px)", position:"sticky", top:0, zIndex:100, flexWrap:"wrap", gap:10 }}>
         <div style={{ display:"flex", alignItems:"center", gap:12 }}>
           <span className="lg">💎</span>
@@ -1130,10 +1070,9 @@ function AppInner() {
           <ConnectButton client={client} chain={MONAD} wallets={WALLETS} theme="dark" connectButton={{ label:"🦊 Connect Wallet" }}/>
         </div>
       </header>
- 
+
       <AdBanner/>
- 
-      {/* STATS BAR */}
+
       {account && (
         <div style={{ display:"flex", gap:10, justifyContent:"center", flexWrap:"wrap", padding:"14px 20px", background:"#080810", borderBottom:"1px solid #111" }}>
           {[
@@ -1150,15 +1089,13 @@ function AppInner() {
           ))}
         </div>
       )}
- 
-      {/* NAV */}
+
       <nav style={{ display:"flex", overflowX:"auto", borderBottom:"1px solid #161625", background:"#0a0a12", padding:"0 16px" }}>
         {TABS.map(t=>(
           <button key={t.id} className={`nav-tab${tab===t.id?" active":""}`} onClick={()=>setTab(t.id)}>{t.label}</button>
         ))}
       </nav>
- 
-      {/* MAIN */}
+
       <main style={{ maxWidth:1200, margin:"0 auto", padding:"36px 20px" }}>
         {tab==="icebox" && (
           <div>
@@ -1188,24 +1125,24 @@ function AppInner() {
         {tab==="near"   && <NearPanel/>}
         {tab==="wallet" && <WalletPanel account={account} balance={balance} myBoxes={myBoxes} opened={opened} totalNftMinted={totalNftMinted} tokenStats={tokenStats}/>}
       </main>
- 
+
       {openingBox && (
         <OpenBoxModal entry={openingBox} nftContract={nftContract} onClose={handleOpenClose} toast={toast}/>
       )}
- 
+
       {gemsPopup && (
         <div key={gemsPopup.id} className="gems-popup" style={{ left:"50%", bottom:"2rem", transform:"translateX(-50%)" }}>
           💎 +{gemsPopup.gems} GEMS
         </div>
       )}
- 
+
       <div className="toast-wrap">
         {toasts.map(t=><div key={t.id} className={`toast ${t.type}`}>{t.msg}</div>)}
       </div>
     </div>
   );
 }
- 
+
 // ─── ROOT ────────────────────────────────────────────────
 export default function App() {
   return (
@@ -1214,4 +1151,3 @@ export default function App() {
     </ThirdwebProvider>
   );
 }
- 
